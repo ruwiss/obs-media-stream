@@ -16,6 +16,7 @@
   let currentTarget = null;
   let pc = null;
   let pendingVideoElement = null;
+  let heartbeatInterval = null; // Arka planı uyanık tutmak için
 
   function onMouseMove(e) {
     if (currentTarget) currentTarget.classList.remove('obs-helper-highlight');
@@ -52,19 +53,24 @@
     }
   }
 
-  // 1. ADIM: OBS'i Uyandır
   function startLiveStream(videoElement) {
     pendingVideoElement = videoElement;
     chrome.runtime.sendMessage({ type: 'start_webrtc' });
+    
+    // Yayın süresince Chrome arka planı (Service Worker) uyumasın diye her 15 saniyede ping at.
+    if (heartbeatInterval) clearInterval(heartbeatInterval);
+    heartbeatInterval = setInterval(() => {
+       chrome.runtime.sendMessage({ type: 'heartbeat' }).catch(()=>{});
+    }, 15000);
   }
 
-  // 2. ADIM: Görüntüyü Aktar
   async function establishWebRTC() {
     if (!pendingVideoElement) return;
 
     let stream;
     try {
-      stream = pendingVideoElement.captureStream ? pendingVideoElement.captureStream() : pendingVideoElement.mozCaptureStream();
+      // 60 FPS zorlaması
+      stream = pendingVideoElement.captureStream ? pendingVideoElement.captureStream(60) : pendingVideoElement.mozCaptureStream(60);
     } catch (err) {
       alert("Bu video DRM nedeniyle yansıtılamıyor.");
       forceStopStream();
@@ -72,7 +78,16 @@
     }
 
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    
+    stream.getTracks().forEach(track => {
+      const sender = pc.addTrack(track, stream);
+      if (track.kind === 'video' && sender.getParameters) {
+        const params = sender.getParameters();
+        // Çözünürlüğün düşmesini kesinlikle yasakla
+        params.degradationPreference = 'maintain-resolution';
+        sender.setParameters(params).catch(()=>{});
+      }
+    });
 
     pc.onicecandidate = e => {
       if (e.candidate) chrome.runtime.sendMessage({ type: 'webrtc_signal', data: { candidate: e.candidate } });
@@ -80,20 +95,24 @@
 
     pc.oniceconnectionstatechange = () => {
       if (pc && pc.iceConnectionState === 'connected') {
-        // Görüntü bağlandığında eklenti kutusunda "Canlı Yayında" yazdırt
         chrome.runtime.sendMessage({ type: 'set_state', state: 'live' });
       }
-      else if (pc && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+      // 'disconnected' (anlık kopmaları) görmezden gel. Sadece tamamen çökerse (failed/closed) kapat.
+      else if (pc && (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed')) {
         forceStopStream();
       }
     };
 
     const offer = await pc.createOffer();
+    
+    // SDP MUNGING: WebRTC'nin kalite düşürmesini engellemek için
+    // Videonun maksimum bit hızını 50 Mbps (50000 kbps) olarak zorla!
+    offer.sdp = offer.sdp.replace(/(m=video.*\r\n)/g, '$1b=AS:50000\r\n');
+    
     await pc.setLocalDescription(offer);
     chrome.runtime.sendMessage({ type: 'webrtc_signal', data: { sdp: offer } });
   }
 
-  // Arka plandan veya Popup'tan gelen zorla durdurma vs. komutları dinliyoruz
   chrome.runtime.onMessage.addListener(async (msg) => {
     if (msg.type === 'force_stop') {
        forceStopStream();
@@ -125,6 +144,10 @@
     if (pc) {
       pc.close();
       pc = null;
+    }
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
     }
     pendingVideoElement = null;
     chrome.runtime.sendMessage({ type: 'set_state', state: 'idle' });

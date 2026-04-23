@@ -13,11 +13,29 @@ chrome.runtime.onInstalled.addListener(() => {
 
 chrome.contextMenus.onClicked.addListener((info) => {
   if (info.menuItemId === "send-to-obs") {
-    fetch('http://localhost:3000/media', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'image', url: info.srcUrl })
-    }).catch(() => {});
+    // OBS'ye resmi yollama fonksiyonu (Güvenilir olması için asenkron yapıldı)
+    const sendImage = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'image', url: info.srcUrl })
+        });
+        if (!response.ok) throw new Error("Sunucu yanıt vermedi.");
+      } catch (err) {
+        console.error("İlk denemede hata oluştu, tekrar deneniyor...", err);
+        // Hata olursa 500ms sonra 1 kere daha dene (İlk açılış gecikmelerine karşı)
+        setTimeout(() => {
+          fetch('http://localhost:3000/media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'image', url: info.srcUrl })
+          }).catch(console.error);
+        }, 500);
+      }
+    };
+    
+    sendImage();
   }
 });
 
@@ -40,16 +58,14 @@ function connectWs() {
 // KLAVYE KISAYOLU DİNLEYİCİSİ (Alt+S)
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "toggle-picker") {
-    // Önce sunucunun açık olup olmadığını kontrol et
     try {
       const res = await fetch('http://localhost:3000/current');
       if (!res.ok) return;
     } catch(e) {
-      return; // Sunucu kapalı
+      return;
     }
 
     if (extensionState === 'idle') {
-      // Başlat
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0] && !tabs[0].url.startsWith('chrome://')) {
           setState('picking');
@@ -58,7 +74,6 @@ chrome.commands.onCommand.addListener(async (command) => {
       });
     } 
     else if (extensionState === 'live' || extensionState === 'connecting') {
-      // Zaten yayındaysa veya bağlanıyorsa, doğrudan YENİ seçim moduna geç
       if (currentStreamingTabId) {
         chrome.tabs.sendMessage(currentStreamingTabId, { type: 'force_stop' }).catch(()=>{});
       }
@@ -70,14 +85,17 @@ chrome.commands.onCommand.addListener(async (command) => {
       });
     }
     else if (extensionState === 'picking') {
-      // Seçim modundaysa iptal et
       setState('idle');
     }
   }
 });
 
 chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
-  if (req.type === 'get_state') {
+  if (req.type === 'heartbeat') {
+    sendResponse({ ok: true });
+    return true;
+  }
+  else if (req.type === 'get_state') {
     sendResponse({ state: extensionState });
   } 
   else if (req.type === 'set_state') {
@@ -92,6 +110,7 @@ chrome.runtime.onMessage.addListener((req, sender, sendResponse) => {
       chrome.tabs.sendMessage(currentStreamingTabId, { type: 'force_stop' }).catch(()=>{});
     }
     setState('idle');
+    currentStreamingTabId = null;
     fetch('http://localhost:3000/media', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

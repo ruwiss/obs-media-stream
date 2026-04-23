@@ -24,7 +24,6 @@ use ax_ws::{
 };
 use axum as ax_ws;
 use tower_http::cors::{Any, CorsLayer};
-use tower_http::services::ServeDir;
 
 use sha2::{Digest, Sha256};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as WsMsg};
@@ -117,8 +116,12 @@ async fn update_obs_source(state: Arc<AppState>, page_name: &str) -> Result<(), 
     }
 
     write.send(WsMsg::Text(identify_req.to_string())).await.map_err(|e| e.to_string())?;
+    
+    // Küçük bir bekleme ekleyelim ki OBS Authentication işlemini bitirip komut almaya hazır hale gelsin
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
-    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs();
+    // Cache-buster: Hem saniye hem de rastgele milisaniye içerir ki OBS sayfayı %100 tazelemek zorunda kalsın.
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
     let overlay_url = format!("http://localhost:3000/overlay/{}?t={}", page_name, now);
     let custom_css = "body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }";
 

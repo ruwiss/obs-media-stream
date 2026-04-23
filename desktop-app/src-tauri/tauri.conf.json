@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "obs-helper",
-    "version": "4.1.0"
+    "version": "1.1.0"
   },
   "build": {
     "beforeDevCommand": "",
@@ -15,7 +15,7 @@
       "all": true
     },
     "bundle": {
-      "active": true,
+      "active": false,
       "targets": "all",
       "identifier": "com.obs.helper",
       "icon": [

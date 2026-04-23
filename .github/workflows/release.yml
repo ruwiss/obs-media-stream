@@ -51,17 +51,9 @@ jobs:
         working-directory: ./desktop-app
         run: npm install
 
-      - name: Build and Release Tauri App
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ./desktop-app
-          tagName: ${{ github.ref_name }}
-          releaseName: 'OBS Helper ${{ github.ref_name }}'
-          releaseBody: 'OBS Helper otomatik sürümü oluşturuldu. Kuruluma gerek kalmadan çalışan Portable dosyaları veya yükleyicileri aşağıdan indirebilirsiniz. Chrome Eklentisini kurmak için `obs-helper-extension.zip` dosyasını indirip tarayıcıya ekleyin.'
-          releaseDraft: false
-          prerelease: false
+      - name: Build Tauri App
+        working-directory: ./desktop-app
+        run: npm run tauri build
 
       - name: Rename and Upload Portable Executable (Windows)
         if: matrix.platform == 'windows-latest'
@@ -82,3 +74,13 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: desktop-app/src-tauri/target/release/obs-helper-portable-linux
+
+      - name: Rename and Upload Portable Executable (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          mv desktop-app/src-tauri/target/release/obs-helper desktop-app/src-tauri/target/release/obs-helper-portable-macos
+      - name: Upload Portable macOS
+        if: matrix.platform == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop-app/src-tauri/target/release/obs-helper-portable-macos
