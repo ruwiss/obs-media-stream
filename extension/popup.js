@@ -10,7 +10,7 @@ function updateUI(state) {
   else if (state === 'picking') {
     statusText.innerHTML = "<span style='color:#ffb900'>Sayfadan video seçin...</span>";
     actionBtn.className = "btn btn-warning";
-    actionBtn.textContent = "Seçimi İptal Et";
+    actionBtn.textContent = "Seçimi İptal Et (Ekranı Temizle)";
   } 
   else if (state === 'connecting') {
     statusText.innerHTML = "<span style='color:#ffb900'>OBS'e Bağlanılıyor...</span>";
@@ -20,36 +20,33 @@ function updateUI(state) {
   else if (state === 'live') {
     statusText.innerHTML = "<div style='display:flex; align-items:center'><span class='live-dot'></span> <span style='color:#ff3b30; font-weight:bold;'>OBS CANLI YAYINDA</span></div>";
     actionBtn.className = "btn btn-danger";
-    actionBtn.textContent = "YAYINI DURDUR";
+    actionBtn.textContent = "YAYINI DURDUR VE EKRANI TEMİZLE";
   }
 }
 
-// Eklenti penceresi ilk açıldığında arka plandan mevcut durumu (state) alıyoruz
 chrome.runtime.sendMessage({ type: 'get_state' }, (res) => {
   if (res && res.state) updateUI(res.state);
 });
 
-// Arka plandan gelen durum güncellemelerini anında dinliyoruz (Görüntü başladığı an renk değişir)
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'state_changed') {
     updateUI(msg.state);
   }
 });
 
-// Butona tıklandığında duruma göre komut gönderiyoruz
 actionBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'get_state' }, (res) => {
     const state = res.state;
     
     if (state === 'idle') {
-      // Seçiciyi başlat komutu (Chrome aktif sekmesinde çalışacak)
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         chrome.runtime.sendMessage({ type: 'start_picker_command', tabId: tabs[0].id });
       });
       updateUI('picking');
     } 
     else {
-      // Ne aşamada olursak olalım, butona basılırsa yayını iptal edip tamamen kapatıyoruz
+      // Picker modundayken, bağlanırken veya canlı yayındayken "İptal" edilirse
+      // eklenti OBS ekranını tamamen "temizle"mesi için arka plana zorla durdur komutu yollar.
       chrome.runtime.sendMessage({ type: 'stop_stream_command' });
       updateUI('idle');
     }

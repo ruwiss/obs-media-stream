@@ -4,23 +4,21 @@ const container = document.getElementById('media-container');
 fetch('http://localhost:3000/current')
   .then(res => res.json())
   .then(data => {
-    if (data.media && data.media.url) {
+    if (data.media && data.media.url && data.media.type !== 'clear') {
       renderMedia(data.media);
     }
   });
 
-// Tüm güncellemeleri artık Helper'ın WebSocket sunucusundan dinliyoruz
 const ws = new WebSocket('ws://localhost:3000');
 
 ws.onmessage = function(event) {
   try {
     const data = JSON.parse(event.data);
-    // Yeni bir resim/video seçildiğinde 'media_update' sinyali gelecek
     if (data.type === 'media_update') {
       renderMedia(data.media);
     }
   } catch (err) {
-    // Sinyalleşme hatalarını yoksay
+    // Hataları yoksay
   }
 };
 
@@ -29,7 +27,13 @@ ws.onclose = () => {
 };
 
 function renderMedia(media) {
+  // Eski içeriği her halükarda temizle
   container.innerHTML = '';
+
+  // Eğer 'clear' veya 'stop_webrtc' geldiyse, sayfa boş ve şeffaf kalacak demektir.
+  if (media.type === 'clear') {
+     return; // Ekstra hiçbir şey ekleme (Siyah/Şeffaf Ekran)
+  }
 
   if (media.type === 'image') {
     const img = document.createElement('img');
