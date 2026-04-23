@@ -40,7 +40,7 @@ function connectWs() {
 // KLAVYE KISAYOLU DİNLEYİCİSİ (Alt+S)
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "toggle-picker") {
-    // Önce sunucunun açık olup olmadığını kontrol et (Sunucu kapalıysa kısayol çalışmasın)
+    // Önce sunucunun açık olup olmadığını kontrol et
     try {
       const res = await fetch('http://localhost:3000/current');
       if (!res.ok) return;
@@ -56,18 +56,22 @@ chrome.commands.onCommand.addListener(async (command) => {
           chrome.scripting.executeScript({ target: { tabId: tabs[0].id }, files: ['picker.js'] });
         }
       });
-    } else {
-      // Zaten açıksa veya yayındaysa Durdur/İptal Et
+    } 
+    else if (extensionState === 'live' || extensionState === 'connecting') {
+      // Zaten yayındaysa veya bağlanıyorsa, doğrudan YENİ seçim moduna geç
       if (currentStreamingTabId) {
         chrome.tabs.sendMessage(currentStreamingTabId, { type: 'force_stop' }).catch(()=>{});
       }
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && !tabs[0].url.startsWith('chrome://')) {
+          setState('picking');
+          chrome.scripting.executeScript({ target: { tabId: tabs[0].id }, files: ['picker.js'] });
+        }
+      });
+    }
+    else if (extensionState === 'picking') {
+      // Seçim modundaysa iptal et
       setState('idle');
-      // Sunucuya da temizle komutu yolla
-      fetch('http://localhost:3000/media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'clear', url: '' })
-      }).catch(()=>{});
     }
   }
 });

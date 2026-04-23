@@ -192,7 +192,12 @@ async fn main() {
             .route("/current", get(handle_current))
             .route("/ws", get(ws_handler))
             .route("/", get(ws_handler))
-            .nest_service("/overlay", ServeDir::new("../../overlay"))
+            // Dosyaları doğrudan .exe içerisine gömüyoruz (Portable yapı için)
+            .route("/overlay/index.html", get(|| async { ax_ws::response::Html(include_str!("../../../overlay/index.html")) }))
+            .route("/overlay/webrtc.html", get(|| async { ax_ws::response::Html(include_str!("../../../overlay/webrtc.html")) }))
+            .route("/overlay/stream.html", get(|| async { ax_ws::response::Html(include_str!("../../../overlay/stream.html")) }))
+            .route("/overlay/overlay.css", get(|| async { ([(header::CONTENT_TYPE, "text/css")], include_str!("../../../overlay/overlay.css")) }))
+            .route("/overlay/overlay.js", get(|| async { ([(header::CONTENT_TYPE, "application/javascript")], include_str!("../../../overlay/overlay.js")) }))
             .layer(cors)
             .with_state(state_clone);
             

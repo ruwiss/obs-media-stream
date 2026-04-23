@@ -125,7 +125,14 @@
     Durum: Kontrol Ediliyor...
   </div>
 
-  <button class="btn btn-primary" id="action-btn" disabled>VİDEO SEÇİCİ BAŞLAT</button>
+  <div id="single-action-container">
+    <button class="btn btn-primary" id="action-btn" disabled>VİDEO SEÇİCİ BAŞLAT</button>
+  </div>
+
+  <div id="dual-action-container" style="display: none; gap: 10px;">
+    <button class="btn btn-primary" id="new-video-btn" style="flex: 2;">YENİ SEÇ</button>
+    <button class="btn btn-danger" id="stop-video-btn" style="flex: 1;">DURDUR</button>
+  </div>
   
   <div class="shortcut-hint">
     Kısayol: <kbd>Alt + S</kbd>

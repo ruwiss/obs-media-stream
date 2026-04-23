@@ -1,5 +1,9 @@
 const statusText = document.getElementById('status-text');
 const actionBtn = document.getElementById('action-btn');
+const singleActionContainer = document.getElementById('single-action-container');
+const dualActionContainer = document.getElementById('dual-action-container');
+const newVideoBtn = document.getElementById('new-video-btn');
+const stopVideoBtn = document.getElementById('stop-video-btn');
 const offlineWarning = document.getElementById('offline-warning');
 let isServerOnline = false;
 
@@ -28,6 +32,10 @@ async function checkServerHealth() {
 function updateUI(state) {
   if (!isServerOnline) return;
 
+  // Varsayılan görünüm
+  singleActionContainer.style.display = 'block';
+  dualActionContainer.style.display = 'none';
+
   if (state === 'idle') {
     statusText.innerHTML = "<span style='color:#a0a0a0'>Durum: Bekleniyor</span>";
     actionBtn.className = "btn btn-primary";
@@ -45,8 +53,8 @@ function updateUI(state) {
   } 
   else if (state === 'live') {
     statusText.innerHTML = "<div style='display:flex; align-items:center'><span class='live-dot'></span> <span style='color:#ff3b30; font-weight:bold;'>OBS CANLI YAYINDA</span></div>";
-    actionBtn.className = "btn btn-danger";
-    actionBtn.textContent = "YAYINI DURDUR (TEMİZLE)";
+    singleActionContainer.style.display = 'none';
+    dualActionContainer.style.display = 'flex';
   }
 }
 
@@ -62,16 +70,26 @@ chrome.runtime.onMessage.addListener((msg) => {
 actionBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ type: 'get_state' }, (res) => {
     const state = res.state;
-    
     if (state === 'idle') {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         chrome.runtime.sendMessage({ type: 'start_picker_command', tabId: tabs[0].id });
       });
       updateUI('picking');
-    } 
-    else {
+    } else {
       chrome.runtime.sendMessage({ type: 'stop_stream_command' });
       updateUI('idle');
     }
   });
+});
+
+newVideoBtn.addEventListener('click', () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    chrome.runtime.sendMessage({ type: 'start_picker_command', tabId: tabs[0].id });
+  });
+  updateUI('picking');
+});
+
+stopVideoBtn.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ type: 'stop_stream_command' });
+  updateUI('idle');
 });
