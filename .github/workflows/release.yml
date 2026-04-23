@@ -1,0 +1,84 @@
+name: "Release OBS Helper"
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build Extension Zip
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          cd extension
+          zip -r ../obs-helper-extension.zip ./*
+
+      - name: Upload Extension Zip
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: obs-helper-extension.zip
+
+      - name: Install Frontend Dependencies
+        working-directory: ./desktop-app
+        run: npm install
+
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./desktop-app
+          tagName: ${{ github.ref_name }}
+          releaseName: 'OBS Helper ${{ github.ref_name }}'
+          releaseBody: 'OBS Helper otomatik sürümü oluşturuldu. Kuruluma gerek kalmadan çalışan Portable dosyaları veya yükleyicileri aşağıdan indirebilirsiniz. Chrome Eklentisini kurmak için `obs-helper-extension.zip` dosyasını indirip tarayıcıya ekleyin.'
+          releaseDraft: false
+          prerelease: false
+
+      - name: Rename and Upload Portable Executable (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          mv desktop-app/src-tauri/target/release/obs-helper.exe desktop-app/src-tauri/target/release/obs-helper-portable-windows.exe
+      - name: Upload Portable Windows
+        if: matrix.platform == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop-app/src-tauri/target/release/obs-helper-portable-windows.exe
+
+      - name: Rename and Upload Portable Executable (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          mv desktop-app/src-tauri/target/release/obs-helper desktop-app/src-tauri/target/release/obs-helper-portable-linux
+      - name: Upload Portable Linux
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: desktop-app/src-tauri/target/release/obs-helper-portable-linux
