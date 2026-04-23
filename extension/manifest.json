@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "OBS Helper",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Tarayıcı sekmesini ve medyasını sesiyle birlikte canlı olarak OBS'ye yansıtır.",
   "permissions": [
     "contextMenus",
@@ -18,16 +18,23 @@
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
   },
   "icons": {
     "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
+  },
+  "commands": {
+    "toggle-picker": {
+      "suggested_key": {
+        "default": "Alt+S",
+        "mac": "Command+Shift+S"
+      },
+      "description": "OBS Video Seçiciyi Başlat / Durdur"
+    }
   },
   "options_page": "options.html",
   "host_permissions": [

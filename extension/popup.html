@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <style>
     body {
-      width: 240px;
+      width: 250px;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background-color: #2b2e38; /* OBS Dark Theme */
       color: #e0e0e0;
@@ -30,6 +30,18 @@
       font-weight: 600;
     }
 
+    #offline-warning {
+      display: none;
+      background: #a80000;
+      color: white;
+      padding: 10px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 12px;
+      text-align: center;
+      font-weight: bold;
+    }
+
     .status-container {
       text-align: center;
       margin-bottom: 15px;
@@ -53,14 +65,19 @@
       font-size: 14px;
     }
     
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .btn-primary { background: #0078d7; color: white; }
-    .btn-primary:hover { background: #005a9e; }
+    .btn-primary:not(:disabled):hover { background: #005a9e; }
     
     .btn-warning { background: #ffb900; color: #000; }
-    .btn-warning:hover { background: #cc9400; }
+    .btn-warning:not(:disabled):hover { background: #cc9400; }
     
     .btn-danger { background: #d13438; color: white; }
-    .btn-danger:hover { background: #a80000; }
+    .btn-danger:not(:disabled):hover { background: #a80000; }
 
     .live-dot {
       display: inline-block;
@@ -70,6 +87,21 @@
       border-radius: 50%;
       margin-right: 8px;
       animation: pulse 1s infinite;
+    }
+
+    .shortcut-hint {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 11px;
+      color: #888;
+    }
+
+    kbd {
+      background: #444;
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: #ccc;
+      font-family: monospace;
     }
 
     @keyframes pulse {
@@ -85,12 +117,20 @@
     <h3>OBS Helper</h3>
   </div>
 
-  <div class="status-container" id="status-text">
-    Durum: Bekleniyor
+  <div id="offline-warning">
+    ⚠️ Sunucu Kapalı!<br><span style="font-weight: normal;">Lütfen OBS Helper uygulamasını başlatın.</span>
   </div>
 
-  <button class="btn btn-primary" id="action-btn">VİDEO SEÇİCİ BAŞLAT</button>
+  <div class="status-container" id="status-text">
+    Durum: Kontrol Ediliyor...
+  </div>
+
+  <button class="btn btn-primary" id="action-btn" disabled>VİDEO SEÇİCİ BAŞLAT</button>
   
+  <div class="shortcut-hint">
+    Kısayol: <kbd>Alt + S</kbd>
+  </div>
+
   <script src="popup.js"></script>
 </body>
 </html>

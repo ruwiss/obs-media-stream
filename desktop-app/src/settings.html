@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Helper Ayarları</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #2b2e38;
+      color: #e0e0e0;
+      padding: 20px;
+      margin: 0;
+    }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-size: 13px; color: #aaa; }
+    input {
+      width: 100%;
+      padding: 8px;
+      background: #1e2026;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: white;
+      box-sizing: border-box;
+    }
+    input:focus { border-color: #0078d7; outline: none; }
+    .btn-save {
+      width: 100%;
+      padding: 10px;
+      background: #0078d7;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-save:hover { background: #005a9e; }
+    #status { margin-top: 10px; text-align: center; font-size: 12px; min-height: 15px; }
+  </style>
+</head>
+<body>
+  <h3>OBS Bağlantı Ayarları</h3>
+  
+  <div class="form-group">
+    <label>OBS WebSocket URL</label>
+    <input type="text" id="obs-url" placeholder="ws://127.0.0.1:4455">
+  </div>
+  
+  <div class="form-group">
+    <label>WebSocket Şifresi</label>
+    <input type="password" id="obs-password">
+  </div>
+
+  <div class="form-group">
+    <label>Hedef Sahne (Scene) Adı</label>
+    <input type="text" id="obs-scene" placeholder="Sahne">
+  </div>
+
+  <div class="form-group">
+    <label>Hedef Kaynak (Source) Adı</label>
+    <input type="text" id="obs-source" placeholder="HelperImage">
+  </div>
+
+  <button class="btn-save" id="save-btn">AYARLARI KAYDET</button>
+  <div id="status"></div>
+
+  <script>
+    // Tauri v1'de global tauri nesnesine erişim
+    const invoke = window.__TAURI__.invoke;
+
+    async function loadSettings() {
+      console.log("Ayarlar yükleniyor...");
+      try {
+        const config = await invoke('get_config');
+        console.log("Mevcut Ayarlar:", config);
+        document.getElementById('obs-url').value = config.obs_url || "";
+        document.getElementById('obs-password').value = config.obs_password || "";
+        document.getElementById('obs-scene').value = config.obs_scene || "Sahne";
+        document.getElementById('obs-source').value = config.obs_source || "HelperImage";
+      } catch (e) {
+        console.error("Yükleme sırasında Rust hatası:", e);
+        document.getElementById('status').innerHTML = "🔴 Yükleme Hatası!";
+      }
+    }
+
+    document.getElementById('save-btn').addEventListener('click', async () => {
+      console.log("Kaydet butonuna tıklandı.");
+      document.getElementById('status').innerHTML = "Kaydediliyor...";
+
+      const config = {
+        obs_url: document.getElementById('obs-url').value,
+        obs_password: document.getElementById('obs-password').value,
+        obs_scene: document.getElementById('obs-scene').value,
+        obs_source: document.getElementById('obs-source').value
+      };
+      
+      try {
+        await invoke('save_config', { config });
+        console.log("Kaydetme başarılı!");
+        document.getElementById('status').innerHTML = "🟢 Ayarlar Kaydedildi!";
+      } catch (e) {
+        console.error("Kaydetme sırasında Rust hatası:", e);
+        document.getElementById('status').innerHTML = "🔴 Hata: " + e;
+      }
+    });
+
+    // Başlangıçta ayarları yükle
+    loadSettings();
+  </script>
+</body>
+</html>
