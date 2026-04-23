@@ -7,7 +7,6 @@
 </head>
 <body>
   <div id="media-container">
-    <!-- Chrome sekmesinden gelen canlı WebRTC yayını bu videoda oynayacak -->
     <video id="live-video" autoplay playsinline style="width: 100vw; height: 100vh; object-fit: contain; background: transparent;"></video>
   </div>
   
@@ -16,35 +15,55 @@
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
     const video = document.getElementById('live-video');
 
-    // Chrome'dan gelen görüntüyü ve sesi anında videoya aktar
+    let readyInterval;
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'receiver_ready' }));
+      
+      // Eklentiden cevap (Görüntü) gelene kadar her 1 saniyede bir hazır olduğumuzu tekrarla (Garanti olsun)
+      readyInterval = setInterval(() => {
+        if (video.srcObject === null) {
+          ws.send(JSON.stringify({ type: 'receiver_ready' }));
+        }
+      }, 1000);
+    };
+
     pc.ontrack = e => {
       if (video.srcObject !== e.streams[0]) {
         video.srcObject = e.streams[0];
-        console.log("OBS Yayını Almaya Başladı!");
+        video.play().catch(e => console.error("Oynatma hatası:", e));
       }
     };
 
-    // Aday (ICE) bilgilerini geri Chrome'a gönder
     pc.onicecandidate = e => {
       if (e.candidate) {
          ws.send(JSON.stringify({ candidate: e.candidate }));
       }
     };
 
-    // Chrome sekmesinden gelen Offer sinyalini al, onay (Answer) gönder
+    pc.oniceconnectionstatechange = () => {
+      if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
+         video.srcObject = null;
+      }
+    };
+
     ws.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.sdp) {
-        await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
-        // Eğer Chrome bize "Offer" gönderdiyse
-        if (data.sdp.type === 'offer') {
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          ws.send(JSON.stringify({ sdp: answer })); // Answer'ı yolla
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.sdp) {
+          clearInterval(readyInterval); // Teklifi aldık, artık hazır mesajı yollamaya gerek kalmadı!
+          await pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+          
+          if (data.sdp.type === 'offer') {
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(JSON.stringify({ sdp: answer })); 
+          }
+        } else if (data.candidate) {
+          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
         }
-      } else if (data.candidate) {
-        await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+      } catch(err) {
       }
     };
   </script>

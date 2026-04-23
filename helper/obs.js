@@ -23,7 +23,9 @@ async function updateOverlaySource(pageName = 'index.html') {
   }
 
   try {
-    const overlayUrl = `http://localhost:${config.PORT}/overlay/${pageName}`;
+    // Sayfanın sonuna ?t=ZamanDamgası ekleyerek OBS'in eski önbelleği kullanmayıp
+    // sayfayı KESİNLİKLE yeniden yüklemesini (ve Chrome'a Hazırım demesini) sağlıyoruz.
+    const overlayUrl = `http://localhost:${config.PORT}/overlay/${pageName}?t=${Date.now()}`;
     const customCss = "body { background-color: rgba(0, 0, 0, 0); margin: 0px auto; overflow: hidden; }";
 
     await obs.call('SetInputSettings', {

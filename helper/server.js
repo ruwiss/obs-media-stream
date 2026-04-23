@@ -13,11 +13,8 @@ const wss = new WebSocketServer({ server });
 
 app.use(express.json());
 app.use(cors());
-
-// Overlay dosyalarını aç
 app.use('/overlay', express.static(path.join(__dirname, '../overlay')));
 
-// OBS bağlantısı
 obs.connect();
 
 app.post('/media', async (req, res) => {
@@ -25,24 +22,39 @@ app.post('/media', async (req, res) => {
   if (!url) return res.status(400).json({ success: false });
 
   console.log(`\n[Yeni İstek] Tür: ${type} | Veri: ${url}`);
-  mediaStore.setMedia(type, url);
-
-  // Gelen isteğe göre OBS'in kaynağını (Sayfasını) güncelle
-  // 'webrtc' canlı yayın isteği gelirse webrtc.html'e yönlendiriyoruz
-  let page = 'index.html';
+  
+  // Canlı yayın başlatıldığında değil, "RESİM/VİDEO" seçildiğinde ekrana yansıtması için
+  let obsUpdated = false;
+  
   if (type === 'webrtc') {
-    page = 'webrtc.html';
+    obsUpdated = await obs.updateOverlaySource('webrtc.html');
+  } 
+  else if (type === 'stop_webrtc') {
+    // Yayın durdurulduğunda siyah ekran yerine eski resim/video ekranına (index.html) dönsün
+    obsUpdated = await obs.updateOverlaySource('index.html');
+  }
+  else {
+    const savedMedia = mediaStore.setMedia(type, url);
+    obsUpdated = await obs.updateOverlaySource('index.html');
+    
+    // Resim/Video güncellemelerini overlay.js sayfasına bildir
+    wss.clients.forEach(client => {
+      if (client.readyState === 1) {
+        client.send(JSON.stringify({ type: 'media_update', media: savedMedia }));
+      }
+    });
   }
   
-  const obsUpdated = await obs.updateOverlaySource(page);
-  
   res.json({ success: true, obsUpdated });
+});
+
+app.get('/current', (req, res) => {
+  res.json({ success: true, media: mediaStore.getMedia() });
 });
 
 // WEBSOCKET: Chrome Eklentisi ile OBS arasında canlı WebRTC sinyal köprüsü
 wss.on('connection', ws => {
   ws.on('message', message => {
-    // Gelen mesajı bağlantı kuran DİĞER herkese yolla (Eklenti -> OBS | OBS -> Eklenti)
     wss.clients.forEach(client => {
       if (client !== ws && client.readyState === 1) {
          client.send(message.toString());
@@ -54,6 +66,6 @@ wss.on('connection', ws => {
 server.listen(config.PORT, () => {
   console.log('--------------------------------------------------');
   console.log(` Yardımcı Servis Başlatıldı! (Port: ${config.PORT})`);
-  console.log(` WebRTC Sinyal Sunucusu Aktif: ws://localhost:${config.PORT}`);
+  console.log(` WebRTC Sunucusu Aktif: ws://localhost:${config.PORT}`);
   console.log('--------------------------------------------------');
 });

@@ -9,16 +9,27 @@ fetch('http://localhost:3000/current')
     }
   });
 
-// Server-Sent Events (SSE) ile sunucudaki canlı değişiklikleri dinliyoruz
-const evtSource = new EventSource('http://localhost:3000/events');
-evtSource.onmessage = function(event) {
-  const media = JSON.parse(event.data);
-  renderMedia(media);
+// Tüm güncellemeleri artık Helper'ın WebSocket sunucusundan dinliyoruz
+const ws = new WebSocket('ws://localhost:3000');
+
+ws.onmessage = function(event) {
+  try {
+    const data = JSON.parse(event.data);
+    // Yeni bir resim/video seçildiğinde 'media_update' sinyali gelecek
+    if (data.type === 'media_update') {
+      renderMedia(data.media);
+    }
+  } catch (err) {
+    // Sinyalleşme hatalarını yoksay
+  }
 };
 
-// Gelen veriye göre ekranı çizen fonksiyon
+ws.onclose = () => {
+  console.log("Sunucu ile bağlantı koptu. Yeniden bağlanılacak...");
+};
+
 function renderMedia(media) {
-  container.innerHTML = ''; // Eski içeriği temizle
+  container.innerHTML = '';
 
   if (media.type === 'image') {
     const img = document.createElement('img');
@@ -30,14 +41,11 @@ function renderMedia(media) {
     vid.src = media.url;
     vid.autoplay = true;
     vid.loop = true;
-    vid.controls = false; // Kontrolleri gizliyoruz
+    vid.controls = false;
     container.appendChild(vid);
   }
   else if (media.type === 'youtube') {
-    // YouTube için otomatik oynatılan özel bir iframe oluşturuyoruz
     const iframe = document.createElement('iframe');
-    // URL formatı: videoId?t=saniye (Örn: dQw4w9WgXcQ?t=120)
-    // iframe src formatı: https://www.youtube.com/embed/videoId?start=saniye&autoplay=1
     const [videoId, timeParams] = media.url.split('?t=');
     const startTime = timeParams ? `&start=${timeParams}` : '';
     

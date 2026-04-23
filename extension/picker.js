@@ -2,7 +2,7 @@
   if (window.__obsPickerActive) return;
   window.__obsPickerActive = true;
 
-  console.log("OBS Helper: Seçici (picker) başlatıldı. Canlı yansıtmak için bir VİDEO alanını seçin.");
+  console.log("OBS Helper: Seçici (picker) başlatıldı.");
 
   const highlightStyle = document.createElement('style');
   highlightStyle.id = 'obs-helper-highlight-style';
@@ -16,7 +16,8 @@
   document.head.appendChild(highlightStyle);
 
   let currentTarget = null;
-  let pc = null; // PeerConnection
+  let pc = null;
+  let pendingVideoElement = null;
 
   function onMouseMove(e) {
     if (currentTarget) currentTarget.classList.remove('obs-helper-highlight');
@@ -30,7 +31,6 @@
 
     if (currentTarget) currentTarget.classList.remove('obs-helper-highlight');
 
-    // Tıklanan yerdeki elementleri al
     const elementsUnderCursor = document.elementsFromPoint(e.clientX, e.clientY);
     let foundMedia = null;
     
@@ -45,11 +45,10 @@
     }
 
     if (foundMedia && foundMedia.tagName === 'VIDEO') {
-       console.log("Video bulundu, canlı yayın (WebRTC) başlatılıyor...");
+       console.log("Video bulundu, OBS'in hazırlanması bekleniyor...");
        stopPicker();
        startLiveStream(foundMedia);
     } else if (foundMedia && foundMedia.tagName === 'IMG') {
-       console.log("Resim bulundu, doğrudan aktarılıyor...");
        stopPicker();
        sendToHelper('image', foundMedia.src);
     } else {
@@ -58,55 +57,72 @@
     }
   }
 
-  // --- WEBRTC CANLI YAYIN MANTIĞI ---
-  async function startLiveStream(videoElement) {
-    // 1. Arka plana yayına başladığımızı haber veriyoruz
+  // 1. ADIM: Sadece bağlanma sinyalini yolla ve Bekleme ekranını göster
+  function startLiveStream(videoElement) {
+    pendingVideoElement = videoElement;
     chrome.runtime.sendMessage({ type: 'start_webrtc' });
+    showLiveIndicator(true);
+  }
+
+  // 2. ADIM: OBS'den "Ben Hazırım" sinyali geldiğinde Asıl Yayını Başlat
+  async function establishWebRTC() {
+    if (!pendingVideoElement) return;
 
     let stream;
     try {
-      // 2. Videonun tam O ANKİ canlı akışını alıyoruz (sesiyle birlikte)
-      stream = videoElement.captureStream ? videoElement.captureStream() : videoElement.mozCaptureStream();
+      stream = pendingVideoElement.captureStream ? pendingVideoElement.captureStream() : pendingVideoElement.mozCaptureStream();
     } catch (err) {
       alert("Bu video DRM/Güvenlik ayarları nedeniyle doğrudan canlı yansıtılamıyor.");
+      forceStopStream();
       return;
     }
 
-    // 3. WebRTC Bağlantısını Kuruyoruz (Google'ın ücretsiz STUN sunucusu)
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-
-    // Yayınlanacak izleri (ses + görüntü) bağlantıya ekle
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
-    // Aday (ICE) üretildikçe bunu OBS'e iletmek üzere arka plana gönder
     pc.onicecandidate = e => {
       if (e.candidate) {
          chrome.runtime.sendMessage({ type: 'webrtc_signal', data: { candidate: e.candidate } });
       }
     };
 
-    // Teklifi (Offer) oluştur ve OBS'e yolla
+    pc.oniceconnectionstatechange = () => {
+      if (pc && (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed')) {
+        forceStopStream();
+      }
+    };
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     chrome.runtime.sendMessage({ type: 'webrtc_signal', data: { sdp: offer } });
 
-    // Sayfaya küçük bir "Canlı Yayında" etiketi ekle
-    showLiveIndicator();
+    updateLiveIndicatorText("OBS Canlı Yayında");
   }
 
-  // 4. OBS'ten gelen cevapları (Answer) yakala ve işle
   chrome.runtime.onMessage.addListener(async (msg) => {
-    if (msg.type === 'webrtc_signal' && pc) {
+    if (msg.type === 'webrtc_signal') {
        try {
-         if (msg.data.sdp) {
-           await pc.setRemoteDescription(new RTCSessionDescription(msg.data.sdp));
-         } else if (msg.data.candidate) {
-           await pc.addIceCandidate(new RTCIceCandidate(msg.data.candidate));
+         // Eğer OBS'den "Ben Yayını Almaya Hazırım" sinyali geldiyse ve henüz yayın başlatılmadıysa
+         if (msg.data.type === 'receiver_ready') {
+            if (!pc && pendingVideoElement) {
+               console.log("OBS Hazır. WebRTC Görüntü Aktarımı Başlıyor!");
+               await establishWebRTC();
+            }
+         } else if (pc) {
+           if (msg.data.sdp) {
+             await pc.setRemoteDescription(new RTCSessionDescription(msg.data.sdp));
+           } else if (msg.data.candidate) {
+             await pc.addIceCandidate(new RTCIceCandidate(msg.data.candidate));
+           }
          }
        } catch (err) {
          console.error("WebRTC Sinyal Hatası:", err);
        }
     }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (pc) forceStopStream();
   });
 
   function sendToHelper(type, url) {
@@ -115,15 +131,50 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type, url })
-      });
+      }).catch(()=>{});
     });
   }
 
-  function showLiveIndicator() {
+  function showLiveIndicator(isConnecting = false) {
     const div = document.createElement('div');
-    div.innerHTML = "OBS Canlı Yayında (Tıklanan Video Yansıtılıyor)";
-    div.style = "position: fixed; top: 10px; right: 10px; background: rgba(255,0,0,0.8); color: white; padding: 10px; border-radius: 5px; z-index: 999999; font-weight: bold;";
+    div.id = 'obs-helper-live-panel';
+    const text = isConnecting ? "OBS'e Bağlanılıyor..." : "OBS Canlı Yayında";
+    const dotColor = isConnecting ? "yellow" : "white";
+    
+    div.innerHTML = `
+      <div style="display:flex; align-items:center; gap: 10px;">
+         <div id="obs-indicator-dot" style="width: 10px; height: 10px; background: ${dotColor}; border-radius: 50%; animation: pulse 1s infinite;"></div>
+         <span id="obs-indicator-text">${text}</span>
+         <button id="obs-helper-stop-btn" style="padding: 5px 10px; cursor: pointer; border: none; background: white; color: red; border-radius: 3px; font-weight: bold;">Yayını Durdur</button>
+      </div>
+      <style>@keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }</style>
+    `;
+    div.style = "position: fixed; top: 10px; right: 10px; background: rgba(255,0,0,0.8); color: white; padding: 10px; border-radius: 5px; z-index: 999999; font-family: sans-serif;";
     document.body.appendChild(div);
+
+    document.getElementById('obs-helper-stop-btn').addEventListener('click', () => {
+       forceStopStream();
+    });
+  }
+
+  function updateLiveIndicatorText(text) {
+    const span = document.getElementById('obs-indicator-text');
+    const dot = document.getElementById('obs-indicator-dot');
+    if (span) span.innerText = text;
+    if (dot) dot.style.background = 'white';
+  }
+
+  function forceStopStream() {
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+    pendingVideoElement = null;
+    const panel = document.getElementById('obs-helper-live-panel');
+    if (panel) panel.remove();
+
+    sendToHelper('stop_webrtc', 'durduruldu');
+    console.log("OBS Yayını Durduruldu.");
   }
 
   function stopPicker() {
