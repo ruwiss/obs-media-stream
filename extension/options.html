@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Helper Ayarları</title>
+  <style>
+    body { 
+      font-family: sans-serif; 
+      padding: 20px; 
+      max-width: 400px;
+    }
+    .form-group { 
+      margin-bottom: 15px; 
+    }
+    label { 
+      display: block; 
+      margin-bottom: 5px; 
+      font-weight: bold;
+    }
+    input[type="text"] { 
+      width: 100%; 
+      padding: 8px; 
+      box-sizing: border-box;
+    }
+    button { 
+      padding: 8px 15px; 
+      cursor: pointer; 
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #status {
+      color: green;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h2>OBS Helper Ayarları</h2>
+  <div class="form-group">
+    <label for="helperUrl">Yardımcı Servis (Helper) Adresi:</label>
+    <input type="text" id="helperUrl" placeholder="Örn: http://localhost:3000">
+    <small style="color: gray; display: block; margin-top: 5px;">
+      Arka planda çalışan Node.js sunucusunun adresidir.
+    </small>
+  </div>
+  <button id="save">Ayarları Kaydet</button>
+  <p id="status"></p>
+  
+  <script src="options.js"></script>
+</body>
+</html>

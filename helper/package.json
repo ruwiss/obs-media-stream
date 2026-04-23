@@ -1,0 +1,17 @@
+{
+  "name": "obs-helper-service",
+  "version": "1.0.0",
+  "description": "OBS Helper Chrome uzantısı için yerel yardımcı servis",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "obs-websocket-js": "^5.0.5",
+    "ws": "^8.20.0"
+  }
+}

@@ -1,0 +1,37 @@
+# Bağımlılıklar
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.lock
+package-lock.json
+
+# Ortam Değişkenleri ve Gizli Dosyalar
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# İşletim Sistemi Dosyaları
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editör/IDE Dosyaları
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Loglar
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Gemini CLI Geçici Dosyaları
+.gemini/

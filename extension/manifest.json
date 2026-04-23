@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "OBS Helper",
+  "version": "3.0.0",
+  "description": "Tarayıcı sekmesini ve medyasını sesiyle birlikte canlı olarak OBS'ye yansıtır.",
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "storage",
+    "scripting",
+    "tabCapture"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "OBS'ye Canlı Yansıt"
+  },
+  "options_page": "options.html",
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "<all_urls>"
+  ]
+}

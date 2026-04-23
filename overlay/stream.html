@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>OBS Canlı Sekme Yansıtıcı</title>
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <!-- Bu sayfa doğrudan OBS Browser Source içinde açılacak -->
+  <div id="media-container">
+    <video id="stream-video" autoplay playsinline style="width: 100vw; height: 100vh; object-fit: contain; background: transparent;"></video>
+  </div>
+  
+  <script>
+    const videoElement = document.getElementById('stream-video');
+
+    // Sunucudan gelen mevcut medya durumunu kontrol et
+    fetch('http://localhost:3000/current')
+      .then(res => res.json())
+      .then(data => {
+        if (data.media && data.media.type === 'stream') {
+          startStream(data.media.url); // URL aslında streamId'dir
+        }
+      });
+
+    // Sunucudaki değişiklikleri dinle
+    const evtSource = new EventSource('http://localhost:3000/events');
+    evtSource.onmessage = function(event) {
+      const media = JSON.parse(event.data);
+      if (media.type === 'stream') {
+        startStream(media.url);
+      } else if (media.type === 'stop') {
+        videoElement.srcObject = null;
+      } else if (media.type === 'image' || media.type === 'video' || media.type === 'youtube') {
+        // Eski sisteme geri dönmek istenirse sayfayı yenile
+        window.location.href = 'index.html'; 
+      }
+    };
+
+    // Chrome Eklentiler API'sini kullanarak streamId üzerinden akışı alıyoruz
+    // Not: Bu adım OBS içindeki tarayıcıda çalışabilmesi için "desktopCapture" veya navigator.mediaDevices kullanılacak.
+    async function startStream(streamId) {
+      try {
+        // OBS Browser Source içinde çalışan bir Chromium bulunur.
+        // Eklentinin sağladığı streamId'yi kullanarak sekmenin sesini ve görüntüsünü çekiyoruz.
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            mandatory: {
+              chromeMediaSource: 'tab',
+              chromeMediaSourceId: streamId
+            }
+          },
+          video: {
+            mandatory: {
+              chromeMediaSource: 'tab',
+              chromeMediaSourceId: streamId
+            }
+          }
+        });
+        
+        videoElement.srcObject = stream;
+        videoElement.play();
+      } catch (err) {
+        console.error("Yayın alınırken hata oluştu:", err);
+      }
+    }
+  </script>
+</body>
+</html>
